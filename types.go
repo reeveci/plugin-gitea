@@ -52,6 +52,7 @@ type SearchResponse struct {
 
 type CommitResponse struct {
 	Commit struct {
-		ID string `json:"id"`
+		ID      string `json:"id"`
+		Message string `json:"message"`
 	} `json:"commit"`
 }

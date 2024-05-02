@@ -13,6 +13,7 @@ func (p *GiteaPlugin) Discover(trigger schema.Trigger) ([]schema.Pipeline, error
 	action := trigger["action"]
 	ref := trigger["ref"]
 	commit := trigger["commit"]
+	commitMessage := trigger["commitMessage"]
 	repository := trigger["repository"]
 	repositoryURL := trigger["repositoryURL"]
 	cloneURL := trigger["cloneURL"]
@@ -95,15 +96,28 @@ func (p *GiteaPlugin) Discover(trigger schema.Trigger) ([]schema.Pipeline, error
 		},
 	}
 
+	var triggerHeadline string
 	var triggerDescription string
 	switch triggerType {
 	case "push":
+		if strings.HasPrefix(ref, "refs/heads/") {
+			triggerHeadline = fmt.Sprintf("[branch %s]", strings.TrimPrefix(ref, "refs/heads/"))
+		} else if strings.HasPrefix(ref, "refs/tags/") {
+			triggerHeadline = fmt.Sprintf("[tag %s]", strings.TrimPrefix(ref, "refs/tags/"))
+		} else {
+			triggerHeadline = fmt.Sprintf("[push %s]", ref)
+		}
+		if strings.TrimSpace(commitMessage) != "" {
+			triggerHeadline += " " + commitMessage
+		}
 		triggerDescription = fmt.Sprintf("%s: %s", triggerType, ref)
 
 	case "action":
+		triggerHeadline = fmt.Sprintf("[action %s]", action)
 		triggerDescription = fmt.Sprintf("%s: %s", triggerType, action)
 
 	default:
+		triggerHeadline = fmt.Sprintf("[%s]", triggerType)
 		triggerDescription = triggerType
 	}
 	shortCommit := commit
@@ -154,6 +168,9 @@ func (p *GiteaPlugin) Discover(trigger schema.Trigger) ([]schema.Pipeline, error
 			},
 		}
 
+		if strings.TrimSpace(pipelines[i].Headline) == "" {
+			pipelines[i].Headline = triggerHeadline
+		}
 		pipelines[i].Description = description + pipelines[i].Description
 	}
 
