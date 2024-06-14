@@ -79,10 +79,10 @@ Unless the `UNRESTRICTED` setting is enabled, the execution of actions is restri
 - `action` - Action to be passed to pipeline facts
 - `search` - Search term for limiting repository discovery
 
-Actions can also be triggered via the CLI API:
+Actions can also be triggered via the [CLI API](https://github.com/reeveci/reeve-cli):
 
 ```sh
-reeve-cli --url <server-url> gitea action <action> [<search> ...]
+reeve ask gitea action <action> [<search> ...]
 ```
 
 ### Facts
@@ -145,13 +145,13 @@ name: MY_ENV
 value: some-encrypted-value
 ```
 
-Values can be encrypted using the `encrypt` CLI method:
+Values can be encrypted using the `encrypt` [CLI command](https://github.com/reeveci/reeve-cli):
 
 ```sh
-reeve-cli --url <server-url> gitea encrypt "<secret value>"
+reeve ask gitea encrypt '<secret value>'
 ```
 
-Encryption takes place on the server, so make sure to use a secure connection between reeve-cli and the server. That is, use TLS with a valid certificate and do not set the `--insecure` flag.
+Encryption takes place on the server, so make sure to use a secure connection between reeve-cli and the server. That is, use TLS with a valid certificate and do not set the `insecure` option.
 
 #### Cron schedules
 
