@@ -83,7 +83,7 @@ func (s *Scanner) Search(search string) (searchResponse SearchResponse, err erro
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			return searchResponse, fmt.Errorf("determining user failed - %s", string(body))
+			return searchResponse, fmt.Errorf("determining user failed (status %v) - %s", resp.StatusCode, string(body))
 		}
 
 		var userResponse UserResponse
@@ -177,7 +177,7 @@ func (s *Scanner) TestRepositoryAccess(repository string) (bool, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return false, fmt.Errorf("determining user failed - %s", string(body))
+		return false, fmt.Errorf("determining user failed (status %v) - %s", resp.StatusCode, string(body))
 	}
 
 	var userResponse UserResponse
@@ -212,7 +212,7 @@ func (s *Scanner) TestRepositoryAccess(repository string) (bool, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return false, fmt.Errorf("determining assignees for %s failed - %s", repository, string(body))
+		return false, fmt.Errorf("determining assignees for %s failed (status %v) - %s", repository, resp.StatusCode, string(body))
 	}
 
 	var assigneesResponse AssigneesResponse
@@ -383,7 +383,8 @@ func (s *Scanner) readRepositoryConfig(repository string, configFile string, com
 		if ignoreFetchError {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("fetching %s from repository %s failed (status %v) - %s", configFile, repository, resp.StatusCode, err)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("fetching %s from repository %s failed (status %v) - %s", configFile, repository, resp.StatusCode, string(body))
 	}
 
 	var content io.Reader = resp.Body
