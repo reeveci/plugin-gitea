@@ -263,3 +263,6 @@ steps:
       env MY_ENV:
       var MY_VAR:
 ```
+
+If a valid README file is found in the root of the repository, it is appended to all pipelines' descriptions.
+You can disable this for individual pipelines by suffixing your description with `[no readme]`.

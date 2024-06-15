@@ -61,7 +61,12 @@ func (s *DiscoverScanner) Scan(document *SourceDocument) error {
 	case "pipeline":
 		pipeline := document.PipelineDefinition
 
-		if s.readme != "" {
+		var noReadme bool
+		if strings.HasSuffix(strings.ToLower(strings.TrimSpace(pipeline.Description)), "[no readme]") {
+			noReadme = true
+			pipeline.Description = pipeline.Description[:strings.LastIndex(strings.ToLower(pipeline.Description), "[no readme]")]
+		}
+		if s.readme != "" && !noReadme {
 			if pipeline.Description != "" {
 				pipeline.Description += "\n\n---\n\n"
 			}
