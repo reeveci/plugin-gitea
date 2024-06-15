@@ -44,8 +44,8 @@ func (p *GiteaPlugin) Discover(trigger schema.Trigger) ([]schema.Pipeline, error
 		return nil, fmt.Errorf("invalid git trigger - unknown trigger type %s", triggerType)
 	}
 
-	if !p.RepoRegexp.MatchString(repository) {
-		return nil, fmt.Errorf("invalid git trigger - malformed repository identifier %s", repository)
+	if _, err := pathEscapeRepository(repository); err != nil {
+		return nil, fmt.Errorf("invalid git trigger - %s", err)
 	}
 
 	facts := map[string]schema.Fact{
@@ -133,7 +133,7 @@ func (p *GiteaPlugin) Discover(trigger schema.Trigger) ([]schema.Pipeline, error
 	env := make(map[string]schema.Env)
 	pipelineDefs := make([]*schema.PipelineDefinition, 0)
 
-	err := p.Scanner.ScanRepository(repository, commit, NewDiscoverScanner(p, repository, env, &pipelineDefs, defaultConditions))
+	err := p.Scanner.ScanRepository(repository, commit, NewDiscoverScanner(p, repository, commit, env, &pipelineDefs, defaultConditions))
 	if err != nil {
 		return nil, err
 	}

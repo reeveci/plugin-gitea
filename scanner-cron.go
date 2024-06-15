@@ -15,7 +15,11 @@ type CronScanner struct {
 	done       bool
 }
 
-func (s *CronScanner) Scan(document Document) error {
+func (s *CronScanner) Init(rootFiles []FileResponse) error {
+	return nil
+}
+
+func (s *CronScanner) Scan(document *SourceDocument) error {
 	switch document.Type {
 	case "trigger":
 		if document.Cron != "" && document.Action != "" {

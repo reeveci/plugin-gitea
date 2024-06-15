@@ -87,3 +87,17 @@ func collectFiles(webhook Webhook) []string {
 	}
 	return files
 }
+
+func pathEscapeRepository(repository string) (string, error) {
+	parts := strings.Split(repository, "/")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("malformed repository identifier \"%s\"", repository)
+	}
+	for i, part := range parts {
+		if part == "" || part == "." || part == ".." {
+			return "", fmt.Errorf("malformed repository identifier \"%s\"", repository)
+		}
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/"), nil
+}

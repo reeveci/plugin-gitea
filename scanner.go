@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/mileusna/crontab"
@@ -127,17 +128,22 @@ func (s *Scanner) Search(search string) (searchResponse SearchResponse, err erro
 	return
 }
 
-func (s *Scanner) FetchCommit(repo, branch string) (*CommitResponse, error) {
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%sapi/v1/repos/%s/branches/%s", s.plugin.InternalUrl, repo, branch), nil)
+func (s *Scanner) FetchCommit(repository, branch string) (*CommitResponse, error) {
+	reponame, err := pathEscapeRepository(repository)
 	if err != nil {
-		return nil, fmt.Errorf("fetching commit failed - %s", err)
+		return nil, fmt.Errorf("fetching commit from %s failed - %s", repository, err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%sapi/v1/repos/%s/branches/%s", s.plugin.InternalUrl, reponame, url.PathEscape(branch)), nil)
+	if err != nil {
+		return nil, fmt.Errorf("fetching commit from %s failed - %s", repository, err)
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
 
 	resp, err := s.plugin.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("fetching commit failed - %s", err)
+		return nil, fmt.Errorf("fetching commit from %s failed - %s", repository, err)
 	}
 	defer resp.Body.Close()
 
@@ -148,7 +154,7 @@ func (s *Scanner) FetchCommit(repo, branch string) (*CommitResponse, error) {
 	var commitResponse CommitResponse
 	err = json.NewDecoder(resp.Body).Decode(&commitResponse)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing commit response - %s", err)
+		return nil, fmt.Errorf("fetching commit from %s failed - %s", repository, err)
 	}
 
 	return &commitResponse, nil
@@ -177,20 +183,25 @@ func (s *Scanner) TestRepositoryAccess(repository string) (bool, error) {
 	var userResponse UserResponse
 	err = json.NewDecoder(resp.Body).Decode(&userResponse)
 	if err != nil {
-		return false, fmt.Errorf("error parsing user response - %s", err)
+		return false, fmt.Errorf("determining user failed - %s", err)
 	}
 
-	assigneesUrl := fmt.Sprintf("%sapi/v1/repos/%s/assignees", s.plugin.InternalUrl, repository)
+	reponame, err := pathEscapeRepository(repository)
+	if err != nil {
+		return false, fmt.Errorf("determining assignees for %s failed - %s", repository, err)
+	}
+
+	assigneesUrl := fmt.Sprintf("%sapi/v1/repos/%s/assignees", s.plugin.InternalUrl, reponame)
 	req, err = http.NewRequest(http.MethodGet, assigneesUrl, nil)
 	if err != nil {
-		return false, fmt.Errorf("determining assignees failed - %s", err)
+		return false, fmt.Errorf("determining assignees for %s failed - %s", repository, err)
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
 
 	resp, err = s.plugin.http.Do(req)
 	if err != nil {
-		return false, fmt.Errorf("determining assignees failed - %s", err)
+		return false, fmt.Errorf("determining assignees for %s failed - %s", repository, err)
 	}
 	defer resp.Body.Close()
 
@@ -201,13 +212,13 @@ func (s *Scanner) TestRepositoryAccess(repository string) (bool, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return false, fmt.Errorf("determining assignees failed - %s", string(body))
+		return false, fmt.Errorf("determining assignees for %s failed - %s", repository, string(body))
 	}
 
 	var assigneesResponse AssigneesResponse
 	err = json.NewDecoder(resp.Body).Decode(&assigneesResponse)
 	if err != nil {
-		return false, fmt.Errorf("error parsing assignees response - %s", err)
+		return false, fmt.Errorf("determining assignees for %s failed - %s", repository, err)
 	}
 
 	var found bool
@@ -219,6 +230,43 @@ func (s *Scanner) TestRepositoryAccess(repository string) (bool, error) {
 	}
 
 	return found, nil
+}
+
+func (s *Scanner) FetchRootFiles(repository string, ref string) ([]FileResponse, error) {
+	reponame, err := pathEscapeRepository(repository)
+	if err != nil {
+		return nil, fmt.Errorf("scanning repository %s failed - %s", repository, err)
+	}
+
+	urlname := fmt.Sprintf("%sapi/v1/repos/%s/contents", s.plugin.InternalUrl, reponame)
+	if ref != "" {
+		urlname += "?ref=" + url.QueryEscape(ref)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, urlname, nil)
+	if err != nil {
+		return nil, fmt.Errorf("scanning repository %s failed - %s", repository, err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
+
+	resp, err := s.plugin.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("scanning repository %s failed - %s", repository, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, nil
+	}
+
+	var contentsResponse ContentsResponse
+	err = json.NewDecoder(resp.Body).Decode(&contentsResponse)
+	if err != nil {
+		return nil, fmt.Errorf("scanning repository %s failed - %s", repository, err)
+	}
+
+	return contentsResponse, nil
 }
 
 func (s *Scanner) ScanRepository(repository, commit string, scanners ...DocumentScanner) error {
@@ -244,41 +292,28 @@ func (s *Scanner) ScanRepository(repository, commit string, scanners ...Document
 		}
 	}
 
-	configUrl := fmt.Sprintf("%sapi/v1/repos/%s/raw/.reeve.yaml", s.plugin.InternalUrl, repository)
-	if commit != "" {
-		configUrl = fmt.Sprintf("%s?ref=%s", configUrl, commit)
-	}
-
-	req, err := http.NewRequest(http.MethodGet, configUrl, nil)
+	repoRootFiles, err := s.FetchRootFiles(repository, commit)
 	if err != nil {
-		return fmt.Errorf("fetching .reeve.yaml from repository failed - %s", err)
+		return err
 	}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
-
-	resp, err := s.plugin.http.Do(req)
-	if err != nil {
-		return fmt.Errorf("fetching .reeve.yaml from repository failed - %s", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
+	configFile := FindReeveFile(repoRootFiles)
+	if configFile == "" {
 		return nil
 	}
 
-	decoder := yaml.NewDecoder(resp.Body)
-	for {
-		var document Document
-		err = decoder.Decode(&document)
-
-		if errors.Is(err, io.EOF) {
-			break
+	for _, scanner := range scanners {
+		if scanner != nil {
+			scanner.Init(repoRootFiles)
 		}
+	}
 
-		if err != nil {
-			return fmt.Errorf("error parsing .reeve.yaml from repository %s - %s", repository, err)
-		}
+	documents, err := s.loadRepositoryConfig(repository, configFile, commit, true, nil)
+	if err != nil {
+		return err
+	}
 
+	for _, document := range documents {
 		for _, scanner := range scanners {
 			if scanner != nil {
 				err := scanner.Scan(document)
@@ -296,6 +331,93 @@ func (s *Scanner) ScanRepository(repository, commit string, scanners ...Document
 	}
 
 	return nil
+}
+
+func (s *Scanner) loadRepositoryConfig(repository string, configFile string, commit string, ignoreFetchError bool, templateData any) ([]*SourceDocument, error) {
+	documents, err := s.readRepositoryConfig(repository, configFile, commit, ignoreFetchError, templateData)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*SourceDocument, 0, len(documents))
+
+	for _, document := range documents {
+		switch document.Type {
+		case "include":
+			if document.Path == "" {
+				return nil, fmt.Errorf("error resolving include in %s from repository %s - no path specified", configFile, repository)
+			}
+
+			results, err := s.loadRepositoryConfig(repository, document.Path, commit, false, document.TemplateData)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, results...)
+
+		default:
+			result = append(result, document)
+		}
+	}
+
+	return result, nil
+}
+
+func (s *Scanner) readRepositoryConfig(repository string, configFile string, commit string, ignoreFetchError bool, templateData any) ([]*SourceDocument, error) {
+	var ok bool
+	for _, ext := range ReeveFileExtensions {
+		if strings.HasSuffix(configFile, ext) {
+			ok = true
+		}
+	}
+	if !ok {
+		return nil, fmt.Errorf("error loading %s from repository %s - invalid file extension, please use one of %s", configFile, repository, strings.Join(ReeveFileExtensions, ", "))
+	}
+
+	resp, err := s.plugin.FetchRepoFileContent(repository, configFile, commit)
+	if err != nil {
+		return nil, fmt.Errorf("fetching %s from repository %s failed - %s", configFile, repository, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if ignoreFetchError {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("fetching %s from repository %s failed (status %v) - %s", configFile, repository, resp.StatusCode, err)
+	}
+
+	var content io.Reader = resp.Body
+	if IsTemplate(configFile) {
+		template, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s from repository %s - %s", configFile, repository, err)
+		}
+
+		content, err = ParseTemplate(configFile, string(template), templateData)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing template %s from repository %s - %s", configFile, repository, err)
+		}
+	}
+
+	var result []*SourceDocument
+
+	decoder := yaml.NewDecoder(content)
+	for {
+		document := SourceDocument{SourceFile: configFile}
+		err = decoder.Decode(&document.Document)
+
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("error parsing %s from repository %s - %s", configFile, repository, err)
+		}
+
+		result = append(result, &document)
+	}
+
+	return result, nil
 }
 
 type ScanRequest struct {
@@ -390,7 +512,8 @@ func (s *Scanner) notify(repository string) {
 }
 
 type DocumentScanner interface {
-	Scan(document Document) error
+	Init(rootFiles []FileResponse) error
+	Scan(document *SourceDocument) error
 	Done()
 	Close()
 }

@@ -23,7 +23,11 @@ type WebUIScanner struct {
 	done       bool
 }
 
-func (s *WebUIScanner) Scan(document Document) error {
+func (s *WebUIScanner) Init(rootFiles []FileResponse) error {
+	return nil
+}
+
+func (s *WebUIScanner) Scan(document *SourceDocument) error {
 	switch document.Type {
 	case "pipeline":
 		for _, action := range document.When["action"].Include {

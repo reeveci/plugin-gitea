@@ -110,9 +110,9 @@ Therefore actions must always be specified explicitely by also adding conditions
 
 ### Pipeline definition
 
-Pipelines and environment variables are defined in the `/.reeve.yaml` file in a repository's root directory.
+Pipelines and environment variables are defined in the file `/.reeve.yaml` in a repository's root directory (or `/.reeve.yml`).
 
-The file can contain multiple YAML documents, e.g. (using a docker runner):
+A pipeline file can contain multiple YAML documents, which are divided with `---`, e.g.:
 
 ```yaml
 ---
@@ -126,6 +126,31 @@ name: hello-world
 
 steps: []
 ```
+
+#### Templating
+
+Pipeline files can optionally be dynamically generated with [Go Templating](https://pkg.go.dev/text/template), which can be quite powerful if you have a lot of redundant pipelines in your project.
+To enable the templating feature for a file, append the extension `.tmpl` (e.g. `/.reeve.yaml.tmpl`).
+
+#### File Includes
+
+```yaml
+---
+type: include
+path: path/to/file.yaml
+
+---
+type: include
+path: path/to/file.yaml.tmpl
+templateData:
+  any:
+    - thing
+```
+
+The file to be included must end with one of the extensions `.yaml`, `.yml`, `.yaml.tmpl` or `.yml.tmpl`.
+
+If you include a template file, the key `templateData` can be used to provide parameters to your template as `.` (dot).
+The key `templateData` may contain any valid YAML.
 
 #### Variables
 

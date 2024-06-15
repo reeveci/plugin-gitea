@@ -33,6 +33,13 @@ type Document struct {
 	Value                     string `yaml:"value"`
 	Cron                      string `yaml:"cron"`
 	Action                    string `yaml:"action"`
+	Path                      string `yaml:"path"`
+	TemplateData              any    `yaml:"templateData"`
+}
+
+type SourceDocument struct {
+	Document
+	SourceFile string
 }
 
 type UserResponse struct {
@@ -55,4 +62,12 @@ type CommitResponse struct {
 		ID      string `json:"id"`
 		Message string `json:"message"`
 	} `json:"commit"`
+}
+
+type ContentsResponse []FileResponse
+
+type FileResponse struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+	Type string `json:"type"`
 }

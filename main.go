@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"regexp"
 	"strings"
 	"sync"
 
@@ -20,8 +19,7 @@ func main() {
 		Plugin: &GiteaPlugin{
 			Log: log,
 
-			http:       &http.Client{},
-			RepoRegexp: regexp.MustCompile("^[^/]+/[^/]+$"),
+			http: &http.Client{},
 		},
 
 		Logger: log,
@@ -47,8 +45,7 @@ type GiteaPlugin struct {
 	CronActions *CronActions
 	Scanner     *Scanner
 
-	http       *http.Client
-	RepoRegexp *regexp.Regexp
+	http *http.Client
 }
 
 func (p *GiteaPlugin) Name() (string, error) {

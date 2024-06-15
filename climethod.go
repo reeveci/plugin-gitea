@@ -10,7 +10,7 @@ import (
 
 var CLIMethods = map[string]string{
 	"action":  "<action> [<search ...>] - execute action",
-	"encrypt": "<secret value> - encrypt variables for usage in .reeve.yaml secrets",
+	"encrypt": "<secret value> - encrypt variables for usage in pipeline file secrets",
 	"rescan":  "rescan all repositories",
 }
 
