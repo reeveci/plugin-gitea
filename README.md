@@ -129,8 +129,10 @@ steps: []
 
 #### Templating
 
-Pipeline files can optionally be dynamically generated with [Go Templating](https://pkg.go.dev/text/template), which can be quite powerful if you have a lot of redundant pipelines in your project.
-To enable the templating feature for a file, append the extension `.tmpl` (e.g. `/.reeve.yaml.tmpl`).
+Pipeline files can use Go templating to automatically generate repetitive pipelines.
+To enable the feature for a file, append the extension `.tmpl` to its name (e.g. `/.reeve.yaml.tmpl`).
+Files with the `.tmpl` extension must be valid [Go templates](https://pkg.go.dev/text/template),
+and can use [sprig template functions](https://masterminds.github.io/sprig/).
 
 #### File Includes
 
