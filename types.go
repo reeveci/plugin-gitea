@@ -48,13 +48,15 @@ type UserResponse struct {
 
 type AssigneesResponse []UserResponse
 
+type SearchResult []struct {
+	FullName      string `json:"full_name"`
+	HtmlURL       string `json:"html_url"`
+	CloneURL      string `json:"clone_url"`
+	DefaultBranch string `json:"default_branch"`
+}
+
 type SearchResponse struct {
-	Data []struct {
-		FullName      string `json:"full_name"`
-		HtmlURL       string `json:"html_url"`
-		CloneURL      string `json:"clone_url"`
-		DefaultBranch string `json:"default_branch"`
-	} `json:"data"`
+	Data SearchResult `json:"data"`
 }
 
 type CommitResponse struct {

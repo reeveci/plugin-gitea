@@ -62,7 +62,7 @@ func (s *Scanner) Close() {
 	close(s.queue)
 }
 
-func (s *Scanner) Search(search string) (searchResponse SearchResponse, err error) {
+func (s *Scanner) Search(search string) (result SearchResult, err error) {
 	searchUrl := fmt.Sprintf("%sapi/v1/repos/search", s.plugin.InternalUrl)
 	query := url.Values{}
 
@@ -70,26 +70,26 @@ func (s *Scanner) Search(search string) (searchResponse SearchResponse, err erro
 		userUrl := fmt.Sprintf("%sapi/v1/user", s.plugin.InternalUrl)
 		req, err := http.NewRequest(http.MethodGet, userUrl, nil)
 		if err != nil {
-			return searchResponse, fmt.Errorf("determining user failed - %s", err)
+			return nil, fmt.Errorf("determining user failed - %s", err)
 		}
 
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
 
 		resp, err := s.plugin.http.Do(req)
 		if err != nil {
-			return searchResponse, fmt.Errorf("determining user failed - %s", err)
+			return nil, fmt.Errorf("determining user failed - %s", err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			return searchResponse, fmt.Errorf("determining user failed (status %v) - %s", resp.StatusCode, string(body))
+			return nil, fmt.Errorf("determining user failed (status %v) - %s", resp.StatusCode, string(body))
 		}
 
 		var userResponse UserResponse
 		err = json.NewDecoder(resp.Body).Decode(&userResponse)
 		if err != nil {
-			return searchResponse, fmt.Errorf("error parsing user response - %s", err)
+			return nil, fmt.Errorf("error parsing user response - %s", err)
 		}
 
 		query.Set("uid", strconv.Itoa(userResponse.ID))
@@ -99,30 +99,49 @@ func (s *Scanner) Search(search string) (searchResponse SearchResponse, err erro
 		query.Set("q", search)
 	}
 
-	if len(query) > 0 {
+	page := 1
+
+	for {
+		query.Set("page", strconv.Itoa(page))
 		searchUrl += fmt.Sprintf("?%s", query.Encode())
-	}
 
-	req, err := http.NewRequest(http.MethodGet, searchUrl, nil)
-	if err != nil {
-		return searchResponse, fmt.Errorf("searching repositories failed - %s", err)
-	}
+		req, err := http.NewRequest(http.MethodGet, searchUrl, nil)
+		if err != nil {
+			return nil, fmt.Errorf("searching repositories failed - %s", err)
+		}
 
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
 
-	resp, err := s.plugin.http.Do(req)
-	if err != nil {
-		return searchResponse, fmt.Errorf("searching repositories failed - %s", err)
-	}
-	defer resp.Body.Close()
+		resp, err := s.plugin.http.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("searching repositories failed - %s", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return searchResponse, nil
-	}
+		if resp.StatusCode != http.StatusOK {
+			return nil, nil
+		}
 
-	err = json.NewDecoder(resp.Body).Decode(&searchResponse)
-	if err != nil {
-		return searchResponse, fmt.Errorf("error parsing search response - %s", err)
+		var res SearchResponse
+		err = json.NewDecoder(resp.Body).Decode(&res)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing search response - %s", err)
+		}
+		if len(res.Data) == 0 {
+			break
+		}
+
+		total, _ := strconv.Atoi(resp.Header.Get("x-total-count"))
+		if result == nil {
+			result = make(SearchResult, 0, total)
+		}
+		result = append(result, res.Data...)
+
+		if total > 0 && len(result) >= total {
+			break
+		}
+
+		page += 1
 	}
 
 	return
@@ -465,14 +484,14 @@ func (s *Scanner) handleQueue() {
 func (s *Scanner) scan() {
 	s.plugin.Log.Info("starting discovery scan")
 
-	searchResponse, err := s.Search("")
+	searchResult, err := s.Search("")
 	if err != nil {
 		s.plugin.Log.Error(err.Error())
 		return
 	}
 
-	currentRepos := make(map[string]bool, len(searchResponse.Data))
-	for _, repo := range searchResponse.Data {
+	currentRepos := make(map[string]bool, len(searchResult))
+	for _, repo := range searchResult {
 		currentRepos[repo.FullName] = true
 	}
 	for repository := range s.knownRepos {
@@ -486,7 +505,7 @@ func (s *Scanner) scan() {
 	}
 	s.knownRepos = currentRepos
 
-	for _, repo := range searchResponse.Data {
+	for _, repo := range searchResult {
 		s.notify(repo.FullName)
 	}
 }

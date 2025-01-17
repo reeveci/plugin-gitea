@@ -96,14 +96,14 @@ func (p *GiteaPlugin) Message(source string, message schema.Message) error {
 			return fmt.Errorf("missing action")
 		}
 
-		searchResponse, err := p.Scanner.Search(message.Options["search"])
+		searchResult, err := p.Scanner.Search(message.Options["search"])
 		if err != nil {
 			return err
 		}
 
-		triggers := make([]schema.Trigger, 0, len(searchResponse.Data))
+		triggers := make([]schema.Trigger, 0, len(searchResult))
 
-		for _, repo := range searchResponse.Data {
+		for _, repo := range searchResult {
 			commitResponse, err := p.Scanner.FetchCommit(repo.FullName, repo.DefaultBranch)
 			if err != nil {
 				return err
