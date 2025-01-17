@@ -100,48 +100,57 @@ func (s *Scanner) Search(search string) (result SearchResult, err error) {
 	}
 
 	page := 1
-
 	for {
-		query.Set("page", strconv.Itoa(page))
-		searchUrl += fmt.Sprintf("?%s", query.Encode())
+		done, err := func() (bool, error) {
+			query.Set("page", strconv.Itoa(page))
+			pageSearchUrl := fmt.Sprintf("%s?%s", searchUrl, query.Encode())
 
-		req, err := http.NewRequest(http.MethodGet, searchUrl, nil)
+			req, err := http.NewRequest(http.MethodGet, pageSearchUrl, nil)
+			if err != nil {
+				return false, fmt.Errorf("searching repositories failed - %s", err)
+			}
+
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
+
+			resp, err := s.plugin.http.Do(req)
+			if err != nil {
+				return false, fmt.Errorf("searching repositories failed - %s", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				return true, nil
+			}
+
+			var res SearchResponse
+			err = json.NewDecoder(resp.Body).Decode(&res)
+			if err != nil {
+				return false, fmt.Errorf("error parsing search response - %s", err)
+			}
+			if len(res.Data) == 0 {
+				return true, nil
+			}
+
+			total, _ := strconv.Atoi(resp.Header.Get("x-total-count"))
+			if result == nil {
+				result = make(SearchResult, 0, total)
+			}
+			result = append(result, res.Data...)
+
+			if total > 0 && len(result) >= total {
+				return true, nil
+			}
+
+			page += 1
+			return false, nil
+		}()
+
 		if err != nil {
-			return nil, fmt.Errorf("searching repositories failed - %s", err)
+			return nil, err
 		}
-
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.plugin.Token))
-
-		resp, err := s.plugin.http.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("searching repositories failed - %s", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return nil, nil
-		}
-
-		var res SearchResponse
-		err = json.NewDecoder(resp.Body).Decode(&res)
-		if err != nil {
-			return nil, fmt.Errorf("error parsing search response - %s", err)
-		}
-		if len(res.Data) == 0 {
+		if done {
 			break
 		}
-
-		total, _ := strconv.Atoi(resp.Header.Get("x-total-count"))
-		if result == nil {
-			result = make(SearchResult, 0, total)
-		}
-		result = append(result, res.Data...)
-
-		if total > 0 && len(result) >= total {
-			break
-		}
-
-		page += 1
 	}
 
 	return
