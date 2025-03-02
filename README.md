@@ -1,6 +1,8 @@
 # Reeve CI / CD - Gitea Plugin
 
-This is a [Reeve](https://github.com/reeveci/reeve) plugin for integrating a Gitea server.
+This is a [Reeve](https://github.com/reeveci/reeve) plugin for integrating a [Gitea](https://gitea.com) server.
+
+It is also fully compatible with [Forgejo](https://forgejo.org/).
 
 ## Configuration
 
