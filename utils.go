@@ -88,6 +88,14 @@ func collectFiles(webhook Webhook) []string {
 	return files
 }
 
+func pathEscapeURLSegments(path string) string {
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		parts[i] = url.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
+}
+
 func pathEscapeRepository(repository string) (string, error) {
 	parts := strings.Split(repository, "/")
 	if len(parts) != 2 {

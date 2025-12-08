@@ -23,7 +23,7 @@ func (p *GiteaPlugin) FetchRepoFileContent(repository string, file string, ref s
 		return nil, fmt.Errorf("no file specified")
 	}
 
-	urlname := fmt.Sprintf("%sapi/v1/repos/%s/raw/%s", p.InternalUrl, reponame, url.PathEscape(file))
+	urlname := fmt.Sprintf("%sapi/v1/repos/%s/raw/%s", p.InternalUrl, reponame, pathEscapeURLSegments(file))
 	if ref != "" {
 		urlname += "?ref=" + url.QueryEscape(ref)
 	}

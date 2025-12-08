@@ -395,6 +395,7 @@ func (s *Scanner) readRepositoryConfig(repository string, configFile string, com
 	for _, ext := range ReeveFileExtensions {
 		if strings.HasSuffix(configFile, ext) {
 			ok = true
+			break
 		}
 	}
 	if !ok {
