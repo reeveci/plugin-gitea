@@ -245,7 +245,8 @@ steps:
     input: |
       data to be sent
       to stdin
-    directory: /host/directory/to/be/mounted
+    mounts:
+      - type=bind,src=/host/directory/to/be/mounted,dst=/reeve/mount
     user: "user-or-uid"
     params:
       PARAM1: some-value
